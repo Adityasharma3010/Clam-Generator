@@ -8,10 +8,27 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+<div class="cursor-dot" id="cursorDot"></div>
+
 <div class="wrap">
+  <div class="top-row">
+    <span class="eyebrow">
+      <span class="dot"></span>
+      Fluid sizing tool
+    </span>
+
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light and dark mode">
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+    </button>
+  </div>
+
   <header>
     <h1>Clamp generator</h1>
-    <p class="sub">Fluid CSS sizing between two viewport widths. Supports px, rem, em, vw, vh and %.</p>
+    <p class="sub">Generate a CSS <code>clamp()</code> value between two viewport widths. Works with px, rem, em, vw, vh and percent.</p>
   </header>
 
   <main class="card">
@@ -79,8 +96,8 @@
 
     <div class="output">
       <code id="output">clamp(...)</code>
-      <button id="copyBtn" type="button">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      <button class="copy-btn" id="copyBtn" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
         Copy
       </button>
     </div>
@@ -91,19 +108,24 @@
       <div class="preview-box">
         <span id="previewText">Resize your browser to see this text scale.</span>
       </div>
-      <input type="range" id="vpSlider" min="320" max="1920" value="800">
+      <div class="slider-row">
+        <span>320</span>
+        <input type="range" id="vpSlider" min="320" max="1920" value="800">
+        <span>1920</span>
+      </div>
     </div>
   </main>
 
   <p class="note">
-    Percent bounds are valid, but the fluid interpolation always runs on <code>vw</code> internally — that's
-    how the linear-slope math works. Percent behaves as expected on properties like <code>width</code> or
-    <code>padding</code> (relative to the parent element). For <code>font-size</code>, percent isn't a
-    meaningful unit on its own — prefer px / rem / em / vw there.
+    <strong>About percent —</strong> percent bounds are valid, but the fluid interpolation always runs on
+    <code>vw</code> internally, since that's how the linear-slope formula works. Percent behaves as
+    expected on properties like <code>width</code> or <code>padding</code> (relative to the parent
+    element). For <code>font-size</code>, percent isn't a meaningful standalone unit — prefer
+    px / rem / em / vw there.
   </p>
 
   <footer>
-    <span>Built with plain HTML/CSS/JS · deploy anywhere</span>
+    Built with plain HTML, CSS and JS
   </footer>
 </div>
 
