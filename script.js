@@ -90,7 +90,9 @@ function updatePreview() {
   else if (minSizeUnit === '%') pxSize = (sizeAtVp / 100) * root * 2;
   else pxSize = sizeAtVp;
 
-  pxSize = Math.max(10, Math.min(96, pxSize));
+  const containerWidth = els.previewText.parentElement.clientWidth || 500;
+  const maxAllowed = Math.min(96, containerWidth / 8);
+  pxSize = Math.max(10, Math.min(maxAllowed, pxSize));
   els.previewText.style.fontSize = `${Math.round(pxSize * 10) / 10}px`;
 }
 
