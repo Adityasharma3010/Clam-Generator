@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clamp Generator — Fluid CSS sizing</title>
+<meta name="description" content="Generate CSS clamp() values from min/max viewport and min/max size, with support for px, rem, em, vw, vh and percent.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Clamp generator</h1>
+    <p class="sub">Fluid CSS sizing between two viewport widths. Supports px, rem, em, vw, vh and %.</p>
+  </header>
+
+  <main class="card">
+    <div class="grid">
+      <div class="field">
+        <label for="minVp">Min viewport</label>
+        <div class="row">
+          <input type="number" id="minVp" value="360">
+          <select id="minVpUnit">
+            <option value="px">px</option>
+            <option value="rem">rem</option>
+            <option value="em">em</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="maxVp">Max viewport</label>
+        <div class="row">
+          <input type="number" id="maxVp" value="1440">
+          <select id="maxVpUnit">
+            <option value="px">px</option>
+            <option value="rem">rem</option>
+            <option value="em">em</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="minSize">Min size</label>
+        <div class="row">
+          <input type="number" id="minSize" value="16">
+          <select id="minSizeUnit">
+            <option value="px">px</option>
+            <option value="rem">rem</option>
+            <option value="em">em</option>
+            <option value="vw">vw</option>
+            <option value="vh">vh</option>
+            <option value="%">%</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="maxSize">Max size</label>
+        <div class="row">
+          <input type="number" id="maxSize" value="32">
+          <select id="maxSizeUnit">
+            <option value="px">px</option>
+            <option value="rem">rem</option>
+            <option value="em">em</option>
+            <option value="vw">vw</option>
+            <option value="vh">vh</option>
+            <option value="%">%</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="root-row">
+      <label for="rootFont">Root font size</label>
+      <input type="number" id="rootFont" value="16">
+      <span>px — used to convert rem/em inputs</span>
+    </div>
+
+    <div class="output">
+      <code id="output">clamp(...)</code>
+      <button id="copyBtn" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        Copy
+      </button>
+    </div>
+    <p id="err" class="err"></p>
+
+    <div class="preview">
+      <div class="preview-label">Live preview <span id="previewVpLabel"></span></div>
+      <div class="preview-box">
+        <span id="previewText">Resize your browser to see this text scale.</span>
+      </div>
+      <input type="range" id="vpSlider" min="320" max="1920" value="800">
+    </div>
+  </main>
+
+  <p class="note">
+    Percent bounds are valid, but the fluid interpolation always runs on <code>vw</code> internally — that's
+    how the linear-slope math works. Percent behaves as expected on properties like <code>width</code> or
+    <code>padding</code> (relative to the parent element). For <code>font-size</code>, percent isn't a
+    meaningful unit on its own — prefer px / rem / em / vw there.
+  </p>
+
+  <footer>
+    <span>Built with plain HTML/CSS/JS · deploy anywhere</span>
+  </footer>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
