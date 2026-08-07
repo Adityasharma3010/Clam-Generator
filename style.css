@@ -235,9 +235,13 @@ h1 {
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   margin-bottom: 1.5rem;
+}
+
+.grid > .field {
+  min-width: 0;
 }
 
 label {
@@ -251,6 +255,7 @@ label {
 
 .row {
   display: flex;
+  min-width: 0;
   border: 1px solid var(--field-border);
   border-radius: var(--radius-sm);
   background: var(--field);
