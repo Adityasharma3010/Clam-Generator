@@ -105,9 +105,76 @@ els.copyBtn.addEventListener('click', () => {
   const text = els.output.textContent;
   navigator.clipboard.writeText(text).then(() => {
     const old = els.copyBtn.innerHTML;
-    els.copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied';
+    els.copyBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied';
     setTimeout(() => els.copyBtn.innerHTML = old, 1200);
   });
 });
 
 compute();
+
+/* ---------- theme toggle ---------- */
+const themeToggle = document.getElementById('themeToggle');
+const root = document.documentElement;
+
+function applyTheme(theme) {
+  root.setAttribute('data-theme', theme);
+  localStorage.setItem('clamp-theme', theme);
+}
+
+const savedTheme = localStorage.getItem('clamp-theme');
+const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+applyTheme(savedTheme || (prefersLight ? 'light' : 'dark'));
+
+themeToggle.addEventListener('click', () => {
+  const current = root.getAttribute('data-theme');
+  applyTheme(current === 'light' ? 'dark' : 'light');
+});
+
+/* ---------- custom cursor + glow ---------- */
+const cursorDot = document.getElementById('cursorDot');
+const cursorRing = document.getElementById('cursorRing');
+const cursorGlow = document.getElementById('cursorGlow');
+const isCoarsePointer = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+
+if (!isCoarsePointer) {
+  let ringX = 0, ringY = 0, targetX = 0, targetY = 0;
+  let shown = false;
+
+  window.addEventListener('mousemove', (e) => {
+    targetX = e.clientX;
+    targetY = e.clientY;
+
+    cursorDot.style.transform = `translate(${targetX}px, ${targetY}px) translate(-50%, -50%)`;
+    cursorGlow.style.transform = `translate(${targetX}px, ${targetY}px) translate(-50%, -50%)`;
+
+    if (!shown) {
+      shown = true;
+      cursorDot.style.opacity = '1';
+      cursorRing.style.opacity = '1';
+      cursorGlow.style.opacity = '1';
+    }
+  });
+
+  window.addEventListener('mouseleave', () => {
+    cursorDot.style.opacity = '0';
+    cursorRing.style.opacity = '0';
+    cursorGlow.style.opacity = '0';
+    shown = false;
+  });
+
+  function animateRing() {
+    ringX += (targetX - ringX) * 0.18;
+    ringY += (targetY - ringY) * 0.18;
+    cursorRing.style.transform = `translate(${ringX}px, ${ringY}px) translate(-50%, -50%)`;
+    requestAnimationFrame(animateRing);
+  }
+  animateRing();
+
+  const hoverTargets = 'button, input, select, a, .row';
+  document.addEventListener('mouseover', (e) => {
+    if (e.target.closest(hoverTargets)) cursorRing.classList.add('hover');
+  });
+  document.addEventListener('mouseout', (e) => {
+    if (e.target.closest(hoverTargets)) cursorRing.classList.remove('hover');
+  });
+}
