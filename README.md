@@ -1,21 +1,13 @@
-# Clamp generator
+# Clamp generator (React + Tailwind + GSAP)
 
-A small tool for generating CSS `clamp()` values for fluid, responsive sizing —
-given a min/max viewport and a min/max size. Supports `px`, `rem`, `em`, `vw`,
-`vh`, and `%` for the size inputs.
+Fluid CSS `clamp()` values between two viewports. Supports px, rem, em, vw, vh and %.
 
-No build step, no dependencies — just static HTML/CSS/JS.
+## Deploy (Vercel)
+1. Push this folder to GitHub (replace the old files in the repo).
+2. In Vercel, set **Framework Preset = Vite** (Build `npm run build`, Output `dist`). Vercel runs `npm install` itself.
 
-## Files
-
-- `index.html` — markup
-- `style.css` — dark, flat UI styling
-- `script.js` — clamp math + live preview
-
-## Run locally
-
-Just open `index.html` in a browser, or serve it:
-
-```bash
-npx serve .
+## Local (optional)
+```
+npm install
+npm run dev
 ```

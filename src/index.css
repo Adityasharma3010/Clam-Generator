@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-dim: var(--dim);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-hl: var(--hl);
+}
+
+:root, [data-theme=dark] { --bg:#0a0a0b; --surface:#121214; --line:rgba(255,255,255,.1); --ink:#f3f3ee; --dim:#8d8d96; --accent:#d4ff3f; --accent-ink:#0a0a0b; --hl:#d4ff3f; color-scheme: dark; }
+[data-theme=light] { --bg:#eeece4; --surface:#f9f8f3; --line:rgba(10,10,10,.13); --ink:#101010; --dim:#6a6963; --accent:#c8f52a; --accent-ink:#101010; --hl:#4a6a00; color-scheme: light; }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--font-display); }
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+/* theme switch = circular reveal (animated from JS) */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+/* mouse effect: grid that lights up around the cursor */
+.grid-base, .grid-lit, .glow { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.grid-base, .grid-lit { background-size: 56px 56px; }
+.grid-base { opacity: .55; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); mask-image: radial-gradient(ellipse at 50% 0, #000, transparent 80%); }
+.grid-lit { background-image: linear-gradient(var(--hl) 1px, transparent 1px), linear-gradient(90deg, var(--hl) 1px, transparent 1px); mask-image: radial-gradient(240px circle at var(--mx, 50%) var(--my, 30%), #000, transparent); }
+.glow { background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 30%), color-mix(in srgb, var(--hl) 11%, transparent), transparent 70%); }
+
+/* cards: border light follows the pointer */
+.panel { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 28px; }
+.panel::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(240px circle at var(--px, 50%) var(--py, 50%), var(--hl), transparent 65%);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; -webkit-mask-composite: xor; }
+.panel:hover::before { opacity: 1; }
+
+.num { appearance: textfield; -moz-appearance: textfield; }
+.num::-webkit-outer-spin-button, .num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* intro: lime scan line sweeps down the page */
+.scan { position: fixed; left: 0; right: 0; top: 0; height: 2px; z-index: 5; pointer-events: none; opacity: 0; background: linear-gradient(90deg, transparent, var(--hl), transparent); box-shadow: 0 0 24px 4px var(--hl); }
