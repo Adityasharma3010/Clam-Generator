@@ -34,7 +34,7 @@ function compute() {
   const maxSizeUnit = els.maxSizeUnit.value;
 
   if (minSizeUnit !== maxSizeUnit) {
-    els.err.textContent = 'Min size and max size should use the same unit for a valid clamp().';
+    els.err.textContent = 'Both sizes should use the same unit for a valid clamp().';
     els.err.style.display = 'block';
   } else {
     els.err.style.display = 'none';
@@ -53,11 +53,12 @@ function compute() {
 
   const slopeR = Math.round(slope * 10000) / 10000;
   const yInterceptR = Math.round(yIntercept * 10000) / 10000;
-  const minR = Math.round(minSizeVal * 10000) / 10000;
-  const maxR = Math.round(maxSizeVal * 10000) / 10000;
+  // clamp(MIN, preferred, MAX) needs MIN <= MAX, even when the value shrinks as the viewport grows
+  const lowerR = Math.round(Math.min(minSizeVal, maxSizeVal) * 10000) / 10000;
+  const upperR = Math.round(Math.max(minSizeVal, maxSizeVal) * 10000) / 10000;
 
-  const preferred = `${yInterceptR}${minSizeUnit} + ${slopeR}vw`;
-  const result = `clamp(${minR}${minSizeUnit}, ${preferred}, ${maxR}${maxSizeUnit})`;
+  const preferred = `${yInterceptR}${minSizeUnit} ${slopeR < 0 ? '-' : '+'} ${Math.abs(slopeR)}vw`;
+  const result = `clamp(${lowerR}${minSizeUnit}, ${preferred}, ${upperR}${maxSizeUnit})`;
   els.output.textContent = result;
 
   lastResult = {
