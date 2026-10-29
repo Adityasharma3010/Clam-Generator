@@ -4,7 +4,7 @@ import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { SplitText } from 'gsap/SplitText'
 import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin'
-import { buildClamp, VP_UNITS, SIZE_UNITS } from './lib/clamp'
+import { buildClamp, parseClamp, encodeForm, decodeForm, a11y, VP_UNITS, SIZE_UNITS } from './lib/clamp'
 
 gsap.registerPlugin(useGSAP, SplitText, ScrambleTextPlugin)
 
@@ -107,28 +107,46 @@ function CopyButton({ text, disabled }) {
   )
 }
 
-/* ---------- output: scrambles into the new value ---------- */
+/* ---------- output: scrambles into the new value, copies in 4 formats ---------- */
+const FORMATS = ['clamp()', 'CSS', 'Tailwind', 'Variable']
+const PROPS = { 'font-size': 'text-[length:', width: 'w-[', height: 'h-[', padding: 'p-[', margin: 'm-[', gap: 'gap-[', top: 'top-[', right: 'right-[', bottom: 'bottom-[', left: 'left-[', inset: 'inset-[' }
+const format = (css, k, prop) =>
+  k === 'CSS' ? `${prop}: ${css};` : k === 'Tailwind' ? `${PROPS[prop]}${css.replace(/, /g, ',').replace(/ /g, '_')}]` : k === 'Variable' ? `--size: ${css};` : css
 function Output({ r }) {
-  const el = useRef(), first = useRef(true), text = r.ok ? r.css : r.error
+  const el = useRef(), first = useRef(true)
+  const [k, setK] = useState('clamp()'), [prop, setProp] = useState('font-size')
+  const text = r.ok ? format(r.css, k, prop) : r.error
+  const tips = (k !== 'CSS' && k !== 'Tailwind') || prop === 'font-size' ? a11y(r) : []
   useEffect(() => {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.current.textContent = text; return }
     gsap.to(el.current, { duration: first.current ? 1.2 : 0.45, delay: first.current ? 0.7 : 0, ease: 'none', overwrite: true,
       scrambleText: { text, chars: '0123456789-+.%vwpxrem', speed: 0.7 } })
     first.current = false
   }, [text])
+  const pill = 'rounded-full border border-accent-ink/30 px-3 py-1 font-mono text-xs transition-colors'
   return (
     <section data-wipe="r" className="reveal relative flex flex-wrap items-center justify-between gap-6 overflow-hidden rounded-[28px] bg-accent p-6 text-accent-ink sm:p-8">
       <div className="min-w-0 flex-1">
         <p className="mb-3 font-mono text-[11px] uppercase tracking-widest opacity-60">Your clamp()</p>
         <code ref={el} className={`block break-all font-mono text-xl font-medium leading-snug sm:text-2xl ${r.ok ? '' : 'opacity-60'}`} />
         {r.ok && r.warning && <p className="mt-3 font-mono text-xs font-bold">⚠ {r.warning}</p>}
+        {tips.map((t) => <p key={t} className="mt-3 max-w-xl font-mono text-xs font-bold">♿ {t}</p>)}
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          {FORMATS.map((f) => <button key={f} type="button" onClick={() => setK(f)} className={`${pill} ${f === k ? 'bg-accent-ink text-accent' : 'hover:bg-accent-ink/10'}`}>{f}</button>)}
+          {(k === 'CSS' || k === 'Tailwind') && (
+            <select value={prop} onChange={(e) => setProp(e.target.value)} className={`${pill} bg-transparent outline-none`}>
+              {Object.keys(PROPS).map((p) => <option key={p} className="text-black">{p}</option>)}
+            </select>
+          )}
+        </div>
       </div>
-      <CopyButton text={r.ok ? r.css : ''} disabled={!r.ok} />
+      <CopyButton text={r.ok ? text : ''} disabled={!r.ok} />
     </section>
   )
 }
 
 /* ---------- curve: tweens between shapes, crosshair follows the pointer ---------- */
+const BPS = [360, 768, 1024, 1280, 1440, 1920]
 const fmt = (n) => String(Math.round(n * 100) / 100)
 function Graph({ r, sink }) {
   const svg = useRef(), out = useRef(), shape = useRef({ x0: r.vpMin ?? 360, x1: r.vpMax ?? 1440, a: r.a ?? 16, b: r.b ?? 32 })
@@ -196,6 +214,22 @@ function Graph({ r, sink }) {
           <text data-k="ya" textAnchor="start" /><text data-k="yb" textAnchor="end" />
         </g>
       </svg>
+      {r.ok && (
+        <>
+          <p className="mb-2 mt-5 font-mono text-[11px] uppercase tracking-widest text-dim">At common breakpoints — click to probe</p>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {BPS.map((v) => {
+              const t = Math.min(1, Math.max(0, (v - r.vpMin) / (r.vpMax - r.vpMin)))
+              return (
+                <button key={v} type="button" onClick={() => qv.current(v)} className="rounded-xl border border-line px-3 py-2 text-left transition-colors hover:border-hl">
+                  <span className="block font-mono text-[10px] text-dim">{v}px</span>
+                  <span className="font-mono text-sm">{fmt(r.a + t * (r.b - r.a))}{r.unit}</span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
     </section>
   )
 }
@@ -259,13 +293,31 @@ function Preview({ r, root, probe }) {
   )
 }
 
+function ShareButton({ f }) {
+  const [done, setDone] = useState(false)
+  const go = async () => {
+    const url = `${location.origin}${location.pathname}?${encodeForm(f)}`
+    try { await navigator.clipboard.writeText(url) } catch { prompt('Copy this link', url) }
+    setDone(true); setTimeout(() => setDone(false), 1500)
+  }
+  return <button type="button" onClick={go} className="fade-in h-10 rounded-full border border-line px-4 font-mono text-xs transition-colors hover:border-hl">{done ? 'Link copied ✓' : 'Share link'}</button>
+}
+
 /* ---------- app ---------- */
 export default function App() {
   const root = useRef()
-  const [f, setF] = useState({ minVp: '360', maxVp: '1440', minSize: '16', maxSize: '32', minVpUnit: 'px', maxVpUnit: 'px', minSizeUnit: 'px', maxSizeUnit: 'px', root: '16' })
+  const [f, setF] = useState(() => decodeForm(location.search, { minVp: '360', maxVp: '1440', minSize: '16', maxSize: '32', minVpUnit: 'px', maxVpUnit: 'px', minSizeUnit: 'px', maxSizeUnit: 'px', root: '16' }))
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }))
   const r = buildClamp(f)
   const probe = useRef({ v: 900, val: 24, fn: null })
+  const [pmsg, setPmsg] = useState('')
+  useEffect(() => { const id = setTimeout(() => history.replaceState(null, '', '?' + encodeForm(f)), 400); return () => clearTimeout(id) }, [f])
+  const onPaste = (e) => {
+    const t = e.target.value
+    if (!/clamp\(.*\)/i.test(t)) return setPmsg('')
+    const x = parseClamp(t, parseFloat(f.root))
+    if (x.ok) { setF((s) => ({ ...s, ...x.form })); e.target.value = ''; setPmsg('Loaded ✓') } else setPmsg(x.error)
+  }
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'dark')
 
   const toggle = (e) => {
@@ -306,11 +358,11 @@ export default function App() {
       <div className="relative z-10 mx-auto max-w-6xl px-5 pb-20 pt-6 sm:px-8">
         <header className="flex items-center justify-between">
           <span className="fade-in font-mono text-sm font-bold">clamp<span className="text-hl">()</span>.gen</span>
-          <button onClick={toggle} aria-label="Toggle theme" className="fade-in grid size-10 place-items-center rounded-full border border-line transition-colors hover:border-hl">
+          <div className="flex items-center gap-2"><ShareButton f={f} /><button onClick={toggle} aria-label="Toggle theme" className="fade-in grid size-10 place-items-center rounded-full border border-line transition-colors hover:border-hl">
             {theme === 'dark'
               ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4" /></svg>
               : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>}
-          </button>
+          </button></div>
         </header>
 
         <section className="py-12 sm:py-16">
@@ -320,6 +372,11 @@ export default function App() {
 
         <main className="grid items-start gap-5 lg:grid-cols-12">
           <Panel className="p-6 sm:p-8 lg:col-span-5">
+            <label className="field mb-8 block">
+              <span className="mb-2 block font-mono text-[11px] uppercase tracking-widest text-dim">Paste a clamp() or Tailwind class to load it</span>
+              <input onChange={onPaste} placeholder="clamp(16px, 10.6667px + 1.4815vw, 32px)" className="w-full border-b border-line bg-transparent pb-1 font-mono text-sm outline-none transition-colors placeholder:text-dim/50 focus:border-hl" />
+              {pmsg && <span className="mt-1 block font-mono text-xs text-hl">{pmsg}</span>}
+            </label>
             <p className="mb-5 font-mono text-xs font-bold uppercase tracking-widest text-hl">01 · Viewport range</p>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Min viewport" value={f.minVp} unit={f.minVpUnit} units={VP_UNITS} onValue={set('minVp')} onUnit={set('minVpUnit')} />

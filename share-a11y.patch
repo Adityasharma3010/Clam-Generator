@@ -1,0 +1,113 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index d97a78a..4869134 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -4,7 +4,7 @@ import gsap from 'gsap'
+ import { useGSAP } from '@gsap/react'
+ import { SplitText } from 'gsap/SplitText'
+ import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin'
+-import { buildClamp, parseClamp, VP_UNITS, SIZE_UNITS } from './lib/clamp'
++import { buildClamp, parseClamp, encodeForm, decodeForm, a11y, VP_UNITS, SIZE_UNITS } from './lib/clamp'
+ 
+ gsap.registerPlugin(useGSAP, SplitText, ScrambleTextPlugin)
+ 
+@@ -116,6 +116,7 @@ function Output({ r }) {
+   const el = useRef(), first = useRef(true)
+   const [k, setK] = useState('clamp()'), [prop, setProp] = useState('font-size')
+   const text = r.ok ? format(r.css, k, prop) : r.error
++  const tips = (k !== 'CSS' && k !== 'Tailwind') || prop === 'font-size' ? a11y(r) : []
+   useEffect(() => {
+     if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.current.textContent = text; return }
+     gsap.to(el.current, { duration: first.current ? 1.2 : 0.45, delay: first.current ? 0.7 : 0, ease: 'none', overwrite: true,
+@@ -129,6 +130,7 @@ function Output({ r }) {
+         <p className="mb-3 font-mono text-[11px] uppercase tracking-widest opacity-60">Your clamp()</p>
+         <code ref={el} className={`block break-all font-mono text-xl font-medium leading-snug sm:text-2xl ${r.ok ? '' : 'opacity-60'}`} />
+         {r.ok && r.warning && <p className="mt-3 font-mono text-xs font-bold">⚠ {r.warning}</p>}
++        {tips.map((t) => <p key={t} className="mt-3 max-w-xl font-mono text-xs font-bold">♿ {t}</p>)}
+         <div className="mt-5 flex flex-wrap items-center gap-2">
+           {FORMATS.map((f) => <button key={f} type="button" onClick={() => setK(f)} className={`${pill} ${f === k ? 'bg-accent-ink text-accent' : 'hover:bg-accent-ink/10'}`}>{f}</button>)}
+           {(k === 'CSS' || k === 'Tailwind') && (
+@@ -291,14 +293,25 @@ function Preview({ r, root, probe }) {
+   )
+ }
+ 
++function ShareButton({ f }) {
++  const [done, setDone] = useState(false)
++  const go = async () => {
++    const url = `${location.origin}${location.pathname}?${encodeForm(f)}`
++    try { await navigator.clipboard.writeText(url) } catch { prompt('Copy this link', url) }
++    setDone(true); setTimeout(() => setDone(false), 1500)
++  }
++  return <button type="button" onClick={go} className="fade-in h-10 rounded-full border border-line px-4 font-mono text-xs transition-colors hover:border-hl">{done ? 'Link copied ✓' : 'Share link'}</button>
++}
++
+ /* ---------- app ---------- */
+ export default function App() {
+   const root = useRef()
+-  const [f, setF] = useState({ minVp: '360', maxVp: '1440', minSize: '16', maxSize: '32', minVpUnit: 'px', maxVpUnit: 'px', minSizeUnit: 'px', maxSizeUnit: 'px', root: '16' })
++  const [f, setF] = useState(() => decodeForm(location.search, { minVp: '360', maxVp: '1440', minSize: '16', maxSize: '32', minVpUnit: 'px', maxVpUnit: 'px', minSizeUnit: 'px', maxSizeUnit: 'px', root: '16' }))
+   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }))
+   const r = buildClamp(f)
+   const probe = useRef({ v: 900, val: 24, fn: null })
+   const [pmsg, setPmsg] = useState('')
++  useEffect(() => { const id = setTimeout(() => history.replaceState(null, '', '?' + encodeForm(f)), 400); return () => clearTimeout(id) }, [f])
+   const onPaste = (e) => {
+     const t = e.target.value
+     if (!/clamp\(.*\)/i.test(t)) return setPmsg('')
+@@ -345,11 +358,11 @@ export default function App() {
+       <div className="relative z-10 mx-auto max-w-6xl px-5 pb-20 pt-6 sm:px-8">
+         <header className="flex items-center justify-between">
+           <span className="fade-in font-mono text-sm font-bold">clamp<span className="text-hl">()</span>.gen</span>
+-          <button onClick={toggle} aria-label="Toggle theme" className="fade-in grid size-10 place-items-center rounded-full border border-line transition-colors hover:border-hl">
++          <div className="flex items-center gap-2"><ShareButton f={f} /><button onClick={toggle} aria-label="Toggle theme" className="fade-in grid size-10 place-items-center rounded-full border border-line transition-colors hover:border-hl">
+             {theme === 'dark'
+               ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4" /></svg>
+               : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>}
+-          </button>
++          </button></div>
+         </header>
+ 
+         <section className="py-12 sm:py-16">
+diff --git a/src/lib/clamp.js b/src/lib/clamp.js
+index 65514d0..80370f0 100644
+--- a/src/lib/clamp.js
++++ b/src/lib/clamp.js
+@@ -27,7 +27,7 @@ export function buildClamp(f) {
+   // clamp(MIN, x, MAX) needs MIN <= MAX, even when the value shrinks as the viewport grows
+   const [lo, hi] = A.v <= B.v ? [A, B] : [B, A]
+   const css = `clamp(${r4(lo.v)}${lo.u}, ${r4(icpt)}${u} ${s < 0 ? '-' : '+'} ${Math.abs(s)}vw, ${r4(hi.v)}${hi.u})`
+-  return { ok: true, css, vpMin: A.vp, vpMax: B.vp, a: A.v, b: B.v, unit: u, warning: A.u !== B.u ? 'Use the same unit for both sizes for a valid clamp().' : '' }
++  return { ok: true, css, icpt, vpMin: A.vp, vpMax: B.vp, a: A.v, b: B.v, unit: u, warning: A.u !== B.u ? 'Use the same unit for both sizes for a valid clamp().' : '' }
+ }
+ 
+ // Reads clamp(min, a + b vw, max) (also from CSS / Tailwind text) back into form fields
+@@ -68,3 +68,29 @@ export function parseClamp(str, rootIn) {
+   const rv = (n) => (Math.abs(n - Math.round(n)) < 0.1 ? String(Math.round(n)) : r2(n)) // undo 4-decimal rounding noise
+   return { ok: true, form: { minVp: rv(p.vp), maxVp: rv(q.vp), minVpUnit: 'px', maxVpUnit: 'px', minSize: r2(p.v), maxSize: r2(q.v), minSizeUnit: p.u, maxSizeUnit: q.u } }
+ }
++
++// Share links: ?vp=360px,1440px&size=16px,32px&root=16
++export const encodeForm = (f) =>
++  `vp=${f.minVp}${f.minVpUnit},${f.maxVp}${f.maxVpUnit}&size=${f.minSize}${f.minSizeUnit},${f.maxSize}${f.maxSizeUnit}&root=${f.root}`.replace(/%/g, '%25')
++
++export function decodeForm(search, fallback) {
++  const q = new URLSearchParams(search)
++  const pair = (k) => (q.get(k) || '').split(',').map((s) => s.trim().match(/^(-?\d*\.?\d+)([a-z%]+)$/i))
++  const [v0, v1] = pair('vp'), [s0, s1] = pair('size')
++  if (!(v0 && v1 && s0 && s1)) return fallback
++  if (![v0[2], v1[2]].every((u) => VP_UNITS.includes(u)) || ![s0[2], s1[2]].every((u) => SIZE_UNITS.includes(u))) return fallback
++  const root = parseFloat(q.get('root'))
++  return { minVp: v0[1], minVpUnit: v0[2], maxVp: v1[1], maxVpUnit: v1[2], minSize: s0[1], minSizeUnit: s0[2], maxSize: s1[1], maxSizeUnit: s1[2], root: root > 0 ? String(root) : fallback.root }
++}
++
++// Accessibility tips for font-size use
++export function a11y(r) {
++  if (!r.ok) return []
++  const tips = [], L = ['px', 'rem', 'em']
++  if (L.includes(r.unit) && r.a > 0 && r.b > 0) {
++    const ratio = Math.max(r.a, r.b) / Math.min(r.a, r.b)
++    if (ratio > 2.5) tips.push(`Max is ${Math.round(ratio * 10) / 10}× the min. For font-size, more than 2.5× can fail WCAG 1.4.4 when users zoom.`)
++  }
++  if (r.unit === 'vw' || (L.includes(r.unit) && Math.abs(r.icpt) < 0.01)) tips.push('The size is vw-only, so it ignores browser zoom. For font-size, mix in a rem part (like 1rem + 1vw).')
++  return tips
++}
