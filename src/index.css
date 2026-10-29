@@ -41,3 +41,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font-display
 
 /* intro: lime scan line sweeps down the page */
 .scan { position: fixed; left: 0; right: 0; top: 0; height: 2px; z-index: 5; pointer-events: none; opacity: 0; background: linear-gradient(90deg, transparent, var(--hl), transparent); box-shadow: 0 0 24px 4px var(--hl); }
+
+/* pointer cursors on everything clickable */
+button:not(:disabled), select, input[type=range], [role=radio] { cursor: pointer; }
+button:disabled { cursor: not-allowed; }

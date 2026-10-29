@@ -1,0 +1,32 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index 03a909c..4b28b04 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -205,12 +205,12 @@ function Graph({ r, sink }) {
+     qv.current(d0 + (((e.clientX - b.left) / b.width) * 600 - 16) / 568 * (d1 - d0))
+   }
+   return (
+-    <section data-wipe="r" data-watch="graph" className="panel reveal p-6 sm:p-8">
++    <section data-wipe="r" className="panel reveal p-6 sm:p-8">
+       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+         <p className="font-mono text-[11px] uppercase tracking-widest text-dim">Curve — hover to probe</p>
+         <p ref={out} className="font-mono text-sm text-hl" />
+       </div>
+-      <svg ref={svg} viewBox="0 0 600 260" onPointerMove={probe} className="w-full cursor-crosshair touch-pan-y select-none">
++      <svg ref={svg} viewBox="0 0 600 260" data-watch="graph" onPointerMove={probe} className="w-full cursor-crosshair touch-pan-y select-none">
+         <g stroke="var(--line)" strokeDasharray="3 5"><line data-k="v0" y1="14" y2="226" /><line data-k="v1" y1="14" y2="226" /></g>
+         <line x1="16" x2="584" y1="226" y2="226" stroke="var(--line)" />
+         <path data-k="glow" fill="none" stroke="var(--hl)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" opacity=".15" />
+@@ -368,7 +368,11 @@ function CurveOverlay({ r, sink }) {
+   useEffect(() => { sink.current.mini = draw; return () => { sink.current.mini = null } }, [])
+   useEffect(draw, [r.ok, r.vpMin, r.vpMax, r.a, r.b, r.unit])
+   useEffect(() => {
+-    const io = new IntersectionObserver((es) => es.forEach((e) => setVis((x) => ({ ...x, [e.target.dataset.watch]: e.isIntersecting }))))
++    // the chart counts as "in view" only when most of it is on screen; the preview when any of it is
++    const io = new IntersectionObserver(
++      (es) => es.forEach((e) => { const k = e.target.dataset.watch; setVis((x) => ({ ...x, [k]: k === 'graph' ? e.intersectionRatio >= 0.6 : e.isIntersecting })) }),
++      { threshold: Array.from({ length: 11 }, (_, i) => i / 10) },
++    )
+     document.querySelectorAll('[data-watch]').forEach((n) => io.observe(n))
+     return () => io.disconnect()
+   }, [])

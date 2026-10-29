@@ -8,6 +8,10 @@ import { buildClamp, parseClamp, encodeForm, decodeForm, a11y, VP_UNITS, SIZE_UN
 
 gsap.registerPlugin(useGSAP, SplitText, ScrambleTextPlugin)
 
+const DEFAULT_FORM = { minVp: '360', maxVp: '1440', minSize: '16', maxSize: '32', minVpUnit: 'px', maxVpUnit: 'px', minSizeUnit: 'px', maxSizeUnit: 'px', root: '16' }
+const INITIAL = decodeForm(location.search, DEFAULT_FORM)
+if (location.search) history.replaceState(null, '', location.pathname + location.hash) // keep the address bar clean
+
 /* ---------- mouse effect: spotlight grid that eases after the cursor ---------- */
 function Background() {
   useEffect(() => {
@@ -28,34 +32,38 @@ function Background() {
   return <><div className="grid-base" /><div className="grid-lit" /><div className="glow" /><div className="scan" /></>
 }
 
-function Panel({ className = '', wipe = 'l', children }) {
+function Panel({ className = '', wipe = 'l', watch, children }) {
   const move = (e) => {
     const r = e.currentTarget.getBoundingClientRect()
     e.currentTarget.style.setProperty('--px', e.clientX - r.left + 'px')
     e.currentTarget.style.setProperty('--py', e.clientY - r.top + 'px')
   }
-  return <section onPointerMove={move} data-wipe={wipe} className={`panel reveal ${className}`}>{children}</section>
+  return <section onPointerMove={move} data-wipe={wipe} data-watch={watch} className={`panel reveal ${className}`}>{children}</section>
 }
 
 /* ---------- segmented unit picker with a sliding pill ---------- */
 function UnitSelect({ units, value, onChange }) {
   const box = useRef(), pill = useRef(), first = useRef(true)
+  const place = (anim) => {
+    const b = box.current?.querySelector('[aria-checked=true]')
+    if (!b) return
+    gsap.killTweensOf(pill.current)
+    if (anim) gsap.to(pill.current, { x: b.offsetLeft, width: b.offsetWidth, duration: 0.5, ease: 'expo.out' })
+    else gsap.set(pill.current, { x: b.offsetLeft, width: b.offsetWidth })
+  }
+  useLayoutEffect(() => { place(!first.current); first.current = false }, [value, units.join()])
   useLayoutEffect(() => {
-    const place = (anim) => {
-      const b = box.current.querySelector('[aria-checked=true]')
-      if (b) gsap.to(pill.current, { x: b.offsetLeft, width: b.offsetWidth, duration: anim ? 0.55 : 0, ease: 'expo.out' })
-    }
-    place(!first.current); first.current = false
-    const ro = new ResizeObserver(() => place(false)); ro.observe(box.current)
+    const ro = new ResizeObserver(() => { if (!gsap.isTweening(pill.current)) place(false) })
+    ro.observe(box.current)
     return () => ro.disconnect()
-  }, [value])
+  }, [])
   return (
-    <div ref={box} role="radiogroup" className="relative flex rounded-xl border border-line p-1">
+    <div ref={box} role="radiogroup" className="relative flex overflow-x-auto rounded-xl border border-line p-1 [scrollbar-width:none]">
       <span ref={pill} className="absolute bottom-1 left-0 top-1 rounded-lg bg-accent" style={{ width: 0 }} />
       {units.map((u) => (
         <button key={u} type="button" role="radio" aria-checked={u === value}
-          onClick={(e) => { onChange(u); gsap.fromTo(e.currentTarget, { scale: 0.85 }, { scale: 1, duration: 0.5, ease: 'back.out(3)' }) }}
-          className={`relative z-10 flex-1 rounded-lg py-1.5 font-mono text-xs transition-colors ${u === value ? 'font-bold text-accent-ink' : 'text-dim hover:text-ink'}`}>
+          onClick={(e) => { onChange(u); gsap.fromTo(e.currentTarget, { scale: 0.9 }, { scale: 1, duration: 0.4, ease: 'back.out(2)' }) }}
+          className={`relative z-10 flex-1 whitespace-nowrap rounded-lg px-1 py-1.5 font-mono text-xs font-semibold transition-colors ${u === value ? 'text-accent-ink' : 'text-dim hover:text-ink'}`}>
           {u}
         </button>
       ))}
@@ -109,7 +117,7 @@ function CopyButton({ text, disabled }) {
 
 /* ---------- output: scrambles into the new value, copies in 4 formats ---------- */
 const FORMATS = ['clamp()', 'CSS', 'Tailwind', 'Variable']
-const PROPS = { 'font-size': 'text-[length:', width: 'w-[', height: 'h-[', padding: 'p-[', margin: 'm-[', gap: 'gap-[', top: 'top-[', right: 'right-[', bottom: 'bottom-[', left: 'left-[', inset: 'inset-[' }
+const PROPS = { 'font-size': 'text-[length:', width: 'w-[', height: 'h-[', padding: 'p-[', margin: 'm-[', gap: 'gap-[', top: 'top-[', right: 'right-[', bottom: 'bottom-[', left: 'left-[', inset: 'inset-[', 'line-height': 'leading-[', 'letter-spacing': 'tracking-[', 'border-radius': 'rounded-[', 'padding-inline': 'px-[', 'padding-block': 'py-[' }
 const format = (css, k, prop) =>
   k === 'CSS' ? `${prop}: ${css};` : k === 'Tailwind' ? `${PROPS[prop]}${css.replace(/, /g, ',').replace(/ /g, '_')}]` : k === 'Variable' ? `--size: ${css};` : css
 function Output({ r }) {
@@ -161,7 +169,7 @@ function Graph({ r, sink }) {
     if (hi - lo < 1e-9) { lo -= 1; hi += 1 }
     const pad = (hi - lo) * 0.25; lo -= pad; hi += pad
     const X = (v) => 16 + ((v - d0) / (d1 - d0)) * 568, Y = (v) => 226 - ((v - lo) / (hi - lo)) * 196
-    dom.current = { d0, d1 }
+    dom.current = { d0, d1 }; sink.current.dom = dom.current
     const d = `M${X(d0)},${Y(s.a)}L${X(s.x0)},${Y(s.a)}L${X(s.x1)},${Y(s.b)}L${X(d1)},${Y(s.b)}`
     put('curve', { d }); put('glow', { d })
     put('v0', { x1: X(s.x0), x2: X(s.x0) }); put('v1', { x1: X(s.x1), x2: X(s.x1) })
@@ -173,12 +181,13 @@ function Graph({ r, sink }) {
     const v = Math.min(d1, Math.max(d0, cur.current.v)), val = s.a + Math.min(1, Math.max(0, (v - s.x0) / span)) * (s.b - s.a)
     put('mk', { x1: X(v), x2: X(v) }); put('md', { cx: X(v), cy: Y(val) })
     out.current.textContent = `${fmt(v)}px → ${fmt(val)}${u}`
-    sink.current.v = v; sink.current.val = val; sink.current.fn?.()
+    sink.current.v = v; sink.current.val = val; sink.current.fn?.(); sink.current.mini?.()
   }
 
   useGSAP(() => {
     cur.current.v = (shape.current.x0 + shape.current.x1) / 2
     qv.current = gsap.quickTo(cur.current, 'v', { duration: 0.35, ease: 'power3.out', onUpdate: draw })
+    sink.current.set = (v) => qv.current(v)
     draw()
     const path = $('curve'), L = path.getTotalLength()
     gsap.timeline({ delay: 0.9 })
@@ -201,7 +210,7 @@ function Graph({ r, sink }) {
         <p className="font-mono text-[11px] uppercase tracking-widest text-dim">Curve — hover to probe</p>
         <p ref={out} className="font-mono text-sm text-hl" />
       </div>
-      <svg ref={svg} viewBox="0 0 600 260" onPointerMove={probe} className="w-full touch-pan-y select-none">
+      <svg ref={svg} viewBox="0 0 600 260" data-watch="graph" onPointerMove={probe} className="w-full cursor-crosshair touch-pan-y select-none">
         <g stroke="var(--line)" strokeDasharray="3 5"><line data-k="v0" y1="14" y2="226" /><line data-k="v1" y1="14" y2="226" /></g>
         <line x1="16" x2="584" y1="226" y2="226" stroke="var(--line)" />
         <path data-k="glow" fill="none" stroke="var(--hl)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" opacity=".15" />
@@ -234,69 +243,176 @@ function Graph({ r, sink }) {
   )
 }
 
-/* ---------- live preview: real sizes at the probed viewport ---------- */
+/* ---------- live preview: every place clamp() is used ---------- */
 const MODES = ['text', 'image', 'position', 'spacing']
-const SIDES = ['left', 'right', 'top', 'bottom', 'inset']
-const PROP = { text: 'font-size', image: 'width', spacing: 'padding' }
+const PROPS_BY_MODE = {
+  text: ['font-size', 'line-height', 'letter-spacing'],
+  image: ['width', 'height', 'border-radius'],
+  position: ['left', 'right', 'top', 'bottom', 'inset'],
+  spacing: ['padding', 'padding-inline', 'padding-block', 'margin', 'gap'],
+}
+const pxOf = (val, v, W, mode, root, u) =>
+  u === 'px' ? val : u === 'rem' || u === 'em' ? val * root : u === 'vw' ? (val * v) / 100 : u === 'vh' ? (val * innerHeight) / 100 : (val * (mode === 'text' ? root : W)) / 100
+
 function Preview({ r, root, probe }) {
-  const [mode, setMode] = useState('text'), [side, setSide] = useState('left')
+  const [mode, setMode] = useState('text')
+  const [props, setProps] = useState({ text: 'font-size', image: 'width', position: 'left', spacing: 'padding' })
+  const prop = props[mode]
   const stage = useRef(), frame = useRef(), info = useRef(), E = useRef({}), live = useRef({})
-  live.current = { r, root, mode, side }
+  live.current = { r, root, mode, prop }
   const upd = () => {
-    const { v, val } = probe.current, { r, root, mode, side } = live.current
+    const { v, val } = probe.current, { r, root, mode, prop } = live.current
     if (!stage.current) return
     if (!r.ok) { info.current.textContent = 'Fix the inputs to see the preview'; return }
     const u = r.unit, W = stage.current.clientWidth, fw = Math.min(v, W)
-    const px = u === 'px' ? val : u === 'rem' || u === 'em' ? val * root : u === 'vw' ? (val * v) / 100 : u === 'vh' ? (val * innerHeight) / 100 : (val * (mode === 'text' ? root : fw)) / 100
+    const px = pxOf(val, v, fw, mode, root, u)
+    // stage height follows the biggest value in the range (not the probe), so hovering never shifts the page
+    const big = Math.max(Math.abs(pxOf(r.a, r.vpMin, Math.min(r.vpMin, W), mode, root, u)), Math.abs(pxOf(r.b, r.vpMax, Math.min(r.vpMax, W), mode, root, u)))
+    const need = mode === 'text' ? (prop === 'font-size' ? big * 3.4 + 60 : prop === 'line-height' ? big * 3 + 60 : 280)
+      : mode === 'image' ? (prop === 'height' ? big + 80 : prop === 'width' ? big * 0.625 + 80 : 280)
+      : mode === 'position' ? (prop === 'left' || prop === 'right' ? 280 : 256 + 2 * big)
+      : prop === 'gap' ? big * 2 + 160 : big * 2 + 140
+    stage.current.style.height = Math.min(760, Math.max(280, need)) + 'px'
     frame.current.style.width = fw + 'px'
     const e = E.current[mode]
     if (e) {
-      if (mode === 'text') e.style.fontSize = Math.max(0, px) + 'px'
-      else if (mode === 'image') e.style.width = Math.max(0, px) + 'px'
-      else if (mode === 'spacing') e.style.padding = Math.max(0, px) + 'px'
-      else {
-        const st = e.style, inset = side === 'inset'
-        st.left = st.right = st.top = st.bottom = 'auto'
+      const st = e.style, pos = Math.max(0, px)
+      st.cssText = ''
+      if (mode === 'text') {
+        Object.assign(st, { fontSize: '28px', lineHeight: '1.2' })
+        st[{ 'font-size': 'fontSize', 'line-height': 'lineHeight', 'letter-spacing': 'letterSpacing' }[prop]] = (prop === 'letter-spacing' ? px : pos) + 'px'
+      } else if (mode === 'image') {
+        st.width = '240px'
+        if (prop === 'width') st.width = pos + 'px'
+        else if (prop === 'height') { st.width = 'auto'; st.height = pos + 'px' }
+        else st.borderRadius = pos + 'px'
+      } else if (mode === 'position') {
+        const inset = prop === 'inset'
         st.width = inset ? 'auto' : '96px'; st.height = inset ? 'auto' : '56px'
         if (inset) st.inset = px + 'px'
-        else { st[side] = px + 'px'; st[side === 'left' || side === 'right' ? 'top' : 'left'] = '16px' }
+        else { st[prop] = px + 'px'; st[prop === 'left' || prop === 'right' ? 'top' : 'left'] = '16px' }
+      } else {
+        const kids = [...e.children]
+        Object.assign(st, { display: 'flex', alignItems: 'center', gap: '8px', padding: '12px' })
+        kids.forEach((k) => (k.style.margin = ''))
+        if (prop === 'padding') st.padding = pos + 'px'
+        else if (prop === 'padding-inline') st.paddingInline = pos + 'px'
+        else if (prop === 'padding-block') st.paddingBlock = pos + 'px'
+        else if (prop === 'gap') st.gap = pos + 'px'
+        else { st.gap = '0px'; kids.forEach((k) => (k.style.margin = pos + 'px')) }
       }
     }
-    info.current.textContent = `${mode === 'position' ? side : PROP[mode]}: ${fmt(val)}${u}${u === 'px' ? '' : ' = ' + fmt(px) + 'px'}  @ ${fmt(v)}px viewport`
+    info.current.textContent = `${prop}: ${fmt(val)}${u}${u === 'px' ? '' : ' = ' + fmt(px) + 'px'}  @ ${fmt(v)}px viewport`
   }
   useEffect(() => {
     probe.current.fn = upd
     const ro = new ResizeObserver(upd); ro.observe(stage.current)
     return () => { probe.current.fn = null; ro.disconnect() }
   }, [])
-  useEffect(upd, [mode, side, r.ok, r.unit, root])
+  useEffect(upd, [mode, prop, r.ok, r.unit, r.a, r.b, r.vpMin, r.vpMax, root])
   return (
-    <Panel wipe="t" className="mt-5 p-6 sm:p-8">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <Panel wipe="t" watch="preview" className="mt-5 p-6 sm:p-8">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <p className="font-mono text-xs font-bold uppercase tracking-widest text-hl">03 · Live preview</p>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          {mode === 'position' && <div className="sm:w-80"><UnitSelect units={SIDES} value={side} onChange={setSide} /></div>}
-          <div className="sm:w-80"><UnitSelect units={MODES} value={mode} onChange={setMode} /></div>
+        <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row">
+          <div className="lg:w-72"><UnitSelect units={MODES} value={mode} onChange={setMode} /></div>
+          <div className="lg:w-[30rem]"><UnitSelect units={PROPS_BY_MODE[mode]} value={prop} onChange={(p) => setProps((x) => ({ ...x, [mode]: p }))} /></div>
         </div>
       </div>
       <p ref={info} className="mb-3 font-mono text-sm text-hl" />
       <div ref={stage} className="relative h-[280px] overflow-hidden rounded-2xl border border-line bg-[radial-gradient(var(--line)_1px,transparent_1px)] [background-size:16px_16px]">
         <div ref={frame} className="relative mx-auto h-full overflow-hidden border-x border-line bg-surface">
-          {mode === 'text' && <div className="grid h-full place-items-center p-6 text-center"><p ref={(n) => (E.current.text = n)} className="font-extrabold leading-tight tracking-tight">Fluid type that scales with the viewport</p></div>}
+          {mode === 'text' && <div className="grid h-full place-items-center p-6 text-center"><p ref={(n) => (E.current.text = n)} className="font-extrabold tracking-tight">Fluid type that scales with the viewport</p></div>}
           {mode === 'image' && <div className="grid h-full place-items-center"><div ref={(n) => (E.current.image = n)} className="grid aspect-[16/10] shrink-0 place-items-center rounded-xl bg-gradient-to-br from-accent to-hl"><div className="size-1/4 rounded-full bg-accent-ink/70" /></div></div>}
           {mode === 'position' && <div className="grid h-full place-items-center"><div className="relative h-44 w-72 rounded-2xl border border-line bg-bg"><span className="absolute bottom-2 right-3 font-mono text-[10px] text-dim">relative parent</span><div ref={(n) => (E.current.position = n)} className="absolute grid place-items-center rounded-xl bg-accent/90 font-mono text-xs font-bold text-accent-ink">absolute</div></div></div>}
-          {mode === 'spacing' && <div className="grid h-full place-items-center"><div ref={(n) => (E.current.spacing = n)} className="rounded-2xl border border-dashed border-hl bg-accent/20"><div className="rounded-lg bg-accent px-4 py-2 font-mono text-xs font-bold text-accent-ink">content</div></div></div>}
+          {mode === 'spacing' && <div className="grid h-full place-items-center"><div ref={(n) => (E.current.spacing = n)} className="rounded-2xl border border-dashed border-hl bg-accent/20">{['one', 'two', 'three'].map((t) => <div key={t} className="rounded-lg bg-accent px-4 py-2 font-mono text-xs font-bold text-accent-ink">{t}</div>)}</div></div>}
         </div>
       </div>
-      <p className="mt-3 text-xs text-dim">Hover the curve above to change the viewport. Values are shown at real size inside a frame as wide as the probed viewport.</p>
+      <p className="mt-3 text-xs text-dim">Hover the curve to change the viewport. When the curve scrolls out of view, a mini copy follows you while this section is on screen.</p>
     </Panel>
+  )
+}
+
+/* ---------- mini curve: floats in while the real one is off-screen and the preview is on-screen ---------- */
+function CurveOverlay({ r, sink }) {
+  const box = useRef(), svg = useRef(), out = useRef(), live = useRef(r), tw = useRef(), first = useRef(true)
+  const [vis, setVis] = useState({ graph: true, preview: false })
+  live.current = r
+  const show = !vis.graph && vis.preview
+  const $ = (k) => svg.current.querySelector(`[data-k=${k}]`)
+  const geo = () => {
+    const { vpMin: x0, vpMax: x1, a, b, ok } = live.current
+    if (!ok) return null
+    const span = x1 - x0, d0 = Math.max(0, x0 - span * 0.3), d1 = x1 + span * 0.3
+    let lo = Math.min(a, b), hi = Math.max(a, b)
+    if (hi - lo < 1e-9) { lo -= 1; hi += 1 }
+    const pad = (hi - lo) * 0.25; lo -= pad; hi += pad
+    return { x0, x1, a, b, d0, d1, X: (v) => 8 + ((v - d0) / (d1 - d0)) * 284, Y: (v) => 100 - ((v - lo) / (hi - lo)) * 80 }
+  }
+  const draw = () => {
+    const g = geo()
+    if (!g || !svg.current) return
+    const { x0, x1, a, b, d0, d1, X, Y } = g
+    $('curve').setAttribute('d', `M${X(d0)},${Y(a)}L${X(x0)},${Y(a)}L${X(x1)},${Y(b)}L${X(d1)},${Y(b)}`)
+    const v = Math.min(d1, Math.max(d0, sink.current.v)), val = a + Math.min(1, Math.max(0, (v - x0) / (x1 - x0))) * (b - a)
+    $('mk').setAttribute('x1', X(v)); $('mk').setAttribute('x2', X(v))
+    $('md').setAttribute('cx', X(v)); $('md').setAttribute('cy', Y(val))
+    out.current.textContent = `${fmt(v)}px → ${fmt(val)}${live.current.unit}`
+  }
+  const move = (e) => {
+    const g = geo()
+    if (!g) return
+    const b = svg.current.getBoundingClientRect()
+    sink.current.set?.(g.d0 + ((((e.clientX - b.left) / b.width) * 300 - 8) / 284) * (g.d1 - g.d0))
+  }
+  useEffect(() => { sink.current.mini = draw; return () => { sink.current.mini = null } }, [])
+  useEffect(draw, [r.ok, r.vpMin, r.vpMax, r.a, r.b, r.unit])
+  useEffect(() => {
+    // the chart counts as "in view" only when most of it is on screen; the preview when any of it is
+    const io = new IntersectionObserver(
+      (es) => es.forEach((e) => { const k = e.target.dataset.watch; setVis((x) => ({ ...x, [k]: k === 'graph' ? e.intersectionRatio >= 0.6 : e.isIntersecting })) }),
+      { threshold: Array.from({ length: 11 }, (_, i) => i / 10) },
+    )
+    document.querySelectorAll('[data-watch]').forEach((n) => io.observe(n))
+    return () => io.disconnect()
+  }, [])
+  useEffect(() => {
+    if (first.current && !show) { first.current = false; return }
+    first.current = false
+    tw.current?.kill()
+    const el = box.current, path = $('curve')
+    if (show) {
+      draw()
+      const L = path.getTotalLength()
+      tw.current = gsap.timeline()
+        .fromTo(el, { autoAlpha: 0, y: 48, scale: 0.8, rotate: 2, filter: 'blur(12px)', clipPath: 'inset(100% 0 0 0 round 20px)', transformOrigin: '100% 100%' },
+          { autoAlpha: 1, y: 0, scale: 1, rotate: 0, filter: 'blur(0px)', clipPath: 'inset(0% 0 0 0 round 20px)', duration: 0.8, ease: 'expo.out', clearProps: 'filter' })
+        .from(el.querySelectorAll('[data-in]'), { y: 10, autoAlpha: 0, stagger: 0.07, duration: 0.5, ease: 'power3.out' }, 0.2)
+        .fromTo(path, { strokeDasharray: L, strokeDashoffset: L }, { strokeDashoffset: 0, duration: 0.9, ease: 'power2.out', onComplete: () => { path.style.strokeDasharray = 'none' } }, 0.15)
+        .from($('md'), { scale: 0, transformOrigin: 'center', duration: 0.5, ease: 'back.out(3)' }, 0.6)
+    } else tw.current = gsap.to(el, { autoAlpha: 0, y: 32, scale: 0.9, filter: 'blur(8px)', duration: 0.4, ease: 'power3.in' })
+  }, [show])
+  return (
+    <div ref={box} style={{ visibility: 'hidden', opacity: 0 }} className="fixed bottom-4 left-4 right-4 z-40 rounded-2xl border border-line bg-surface/90 p-4 shadow-2xl backdrop-blur-md sm:left-auto sm:w-80">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <p data-in className="font-mono text-[10px] uppercase tracking-widest text-dim">Curve — hover to probe</p>
+        <p data-in ref={out} className="font-mono text-xs text-hl" />
+      </div>
+      <svg ref={svg} viewBox="0 0 300 116" onPointerMove={move} className="w-full cursor-crosshair touch-pan-y select-none">
+        <line x1="8" x2="292" y1="104" y2="104" stroke="var(--line)" />
+        <path data-k="curve" fill="none" stroke="var(--hl)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <line data-k="mk" y1="12" y2="104" stroke="var(--ink)" opacity=".5" />
+        <circle data-k="md" r="5" fill="var(--bg)" stroke="var(--ink)" strokeWidth="2" />
+      </svg>
+    </div>
   )
 }
 
 function ShareButton({ f }) {
   const [done, setDone] = useState(false)
   const go = async () => {
-    const url = `${location.origin}${location.pathname}?${encodeForm(f)}`
+    const same = Object.keys(DEFAULT_FORM).every((k) => f[k] === DEFAULT_FORM[k])
+    const url = location.origin + location.pathname + (same ? '' : '?' + encodeForm(f))
     try { await navigator.clipboard.writeText(url) } catch { prompt('Copy this link', url) }
     setDone(true); setTimeout(() => setDone(false), 1500)
   }
@@ -306,12 +422,11 @@ function ShareButton({ f }) {
 /* ---------- app ---------- */
 export default function App() {
   const root = useRef()
-  const [f, setF] = useState(() => decodeForm(location.search, { minVp: '360', maxVp: '1440', minSize: '16', maxSize: '32', minVpUnit: 'px', maxVpUnit: 'px', minSizeUnit: 'px', maxSizeUnit: 'px', root: '16' }))
+  const [f, setF] = useState(INITIAL)
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }))
   const r = buildClamp(f)
   const probe = useRef({ v: 900, val: 24, fn: null })
   const [pmsg, setPmsg] = useState('')
-  useEffect(() => { const id = setTimeout(() => history.replaceState(null, '', '?' + encodeForm(f)), 400); return () => clearTimeout(id) }, [f])
   const onPaste = (e) => {
     const t = e.target.value
     if (!/clamp\(.*\)/i.test(t)) return setPmsg('')
@@ -353,8 +468,9 @@ export default function App() {
   }, { scope: root })
 
   return (
-    <div ref={root} className="relative min-h-screen overflow-x-hidden">
+    <div ref={root} className="relative min-h-screen overflow-x-clip">
       <Background />
+      <CurveOverlay r={r} sink={probe} />
       <div className="relative z-10 mx-auto max-w-6xl px-5 pb-20 pt-6 sm:px-8">
         <header className="flex items-center justify-between">
           <span className="fade-in font-mono text-sm font-bold">clamp<span className="text-hl">()</span>.gen</span>
