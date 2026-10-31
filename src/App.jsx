@@ -408,6 +408,49 @@ function CurveOverlay({ r, sink }) {
   )
 }
 
+/* ---------- type scale: many clamps from one viewport range ---------- */
+const slug = (n) => n.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x'
+function Scale({ f }) {
+  const [unit, setUnit] = useState('px'), [kind, setKind] = useState('CSS vars')
+  const [rows, setRows] = useState([{ n: 'h1', a: '32', b: '64' }, { n: 'h2', a: '28', b: '48' }, { n: 'h3', a: '24', b: '36' }, { n: 'h4', a: '20', b: '28' }, { n: 'body', a: '16', b: '18' }])
+  const edit = (i, k) => (e) => setRows((x) => x.map((r, j) => (j === i ? { ...r, [k]: e.target.value } : r)))
+  const res = rows.map((r) => ({ ...r, c: buildClamp({ ...f, minSize: r.a, maxSize: r.b, minSizeUnit: unit, maxSizeUnit: unit }) }))
+  const ok = res.filter((r) => r.c.ok)
+  const text = kind === 'CSS vars'
+    ? `:root {\n${ok.map((r) => `  --step-${slug(r.n)}: ${r.c.css};`).join('\n')}\n}`
+    : `@theme {\n${ok.map((r) => `  --text-${slug(r.n)}: ${r.c.css};`).join('\n')}\n}`
+  const cell = 'min-w-0 border-b border-line bg-transparent pb-1 font-mono text-lg outline-none transition-colors focus:border-hl'
+  return (
+    <Panel wipe="t" className="mt-5 p-6 sm:p-8">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+        <p className="font-mono text-xs font-bold uppercase tracking-widest text-hl">04 · Type scale</p>
+        <div className="w-full sm:w-56"><UnitSelect units={['px', 'rem', 'em']} value={unit} onChange={setUnit} /></div>
+      </div>
+      <p className="mb-4 text-sm text-dim">Uses the viewport range from step 01. Rename the rows to anything (h1, space-lg…) and add as many as you need.</p>
+      <div className="grid gap-x-3 gap-y-4 sm:grid-cols-[1fr_6rem_6rem_2rem]">
+        <p className="hidden font-mono text-[11px] uppercase tracking-widest text-dim sm:block">Name</p>
+        <p className="hidden font-mono text-[11px] uppercase tracking-widest text-dim sm:block">At A</p>
+        <p className="hidden font-mono text-[11px] uppercase tracking-widest text-dim sm:block">At B</p><span className="hidden sm:block" />
+        {res.map((r, i) => (
+          <div key={i} className="contents">
+            <input aria-label="Name" value={r.n} onChange={edit(i, 'n')} className={cell} />
+            <input aria-label="Size at A" type="number" value={r.a} onChange={edit(i, 'a')} className={`num ${cell}`} />
+            <input aria-label="Size at B" type="number" value={r.b} onChange={edit(i, 'b')} className={`num ${cell}`} />
+            <button type="button" aria-label="Remove row" onClick={() => setRows((x) => x.filter((_, j) => j !== i))} className="font-mono text-dim transition-colors hover:text-ink">✕</button>
+            <p className="break-all font-mono text-xs text-dim sm:col-span-4">{r.c.ok ? r.c.css : r.c.error}</p>
+          </div>
+        ))}
+      </div>
+      <button type="button" onClick={() => setRows((x) => [...x, { n: 'new', a: '16', b: '24' }])} className="mt-5 rounded-full border border-line px-4 py-1.5 font-mono text-xs transition-colors hover:border-hl">+ Add row</button>
+      <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
+        <div className="w-full sm:w-72"><UnitSelect units={['CSS vars', '@theme']} value={kind === 'CSS vars' ? 'CSS vars' : '@theme'} onChange={(k) => setKind(k === 'CSS vars' ? 'CSS vars' : 'theme')} /></div>
+        <CopyButton text={ok.length ? text : ''} disabled={!ok.length} />
+      </div>
+      <pre className="mt-3 overflow-x-auto rounded-xl border border-line p-4 font-mono text-xs leading-relaxed text-hl">{text}</pre>
+    </Panel>
+  )
+}
+
 function ShareButton({ f }) {
   const [done, setDone] = useState(false)
   const go = async () => {
@@ -495,13 +538,13 @@ export default function App() {
             </label>
             <p className="mb-5 font-mono text-xs font-bold uppercase tracking-widest text-hl">01 · Viewport range</p>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Min viewport" value={f.minVp} unit={f.minVpUnit} units={VP_UNITS} onValue={set('minVp')} onUnit={set('minVpUnit')} />
-              <Field label="Max viewport" value={f.maxVp} unit={f.maxVpUnit} units={VP_UNITS} onValue={set('maxVp')} onUnit={set('maxVpUnit')} />
+              <Field label="Viewport A" value={f.minVp} unit={f.minVpUnit} units={VP_UNITS} onValue={set('minVp')} onUnit={set('minVpUnit')} />
+              <Field label="Viewport B" value={f.maxVp} unit={f.maxVpUnit} units={VP_UNITS} onValue={set('maxVp')} onUnit={set('maxVpUnit')} />
             </div>
             <p className="mb-5 mt-9 font-mono text-xs font-bold uppercase tracking-widest text-hl">02 · Size at each viewport</p>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="At min viewport" value={f.minSize} unit={f.minSizeUnit} units={SIZE_UNITS} onValue={set('minSize')} onUnit={set('minSizeUnit')} />
-              <Field label="At max viewport" value={f.maxSize} unit={f.maxSizeUnit} units={SIZE_UNITS} onValue={set('maxSize')} onUnit={set('maxSizeUnit')} />
+              <Field label="Size at A" value={f.minSize} unit={f.minSizeUnit} units={SIZE_UNITS} onValue={set('minSize')} onUnit={set('minSizeUnit')} />
+              <Field label="Size at B" value={f.maxSize} unit={f.maxSizeUnit} units={SIZE_UNITS} onValue={set('maxSize')} onUnit={set('maxSizeUnit')} />
             </div>
             <label className="field mt-8 flex items-center gap-3 border-t border-line pt-6 font-mono text-xs text-dim">
               Root font size
@@ -517,6 +560,8 @@ export default function App() {
         </main>
 
         <Preview r={r} root={parseFloat(f.root) > 0 ? parseFloat(f.root) : 16} probe={probe} />
+
+        <Scale f={f} />
 
         <p className="hero-sub mt-10 max-w-2xl text-sm leading-relaxed text-dim">
           <b className="text-ink">About %</b> — percent bounds are valid, but the fluid part always runs on <code className="font-mono">vw</code>. They behave as expected on width, padding or left (relative to the parent); for font-size prefer px, rem or em.
